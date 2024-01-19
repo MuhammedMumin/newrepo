@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model organisation {
+  id                      BigInt                  @id @default(autoincrement())
+  name                    String
+  accountType             OrganisationAccountType @map("account_type")
+  address                 String                  @db.Text
+  clientId                String                  @unique @map("client_id")
+  companySize             CompanySize             @map("company_size")
+  transactionTypes        Json                    @map("transaction_types")
+  customerSize            Int                     @map("customer_size")
+  numberOfTransactions    Int                     @map("number_of_transactions")
+  numberOfVendors         Int                     @map("number_of_vendors")
+  inventorySize           Int                     @map("inventory_size")
+  payrollServicesRequired Boolean                 @default(false) @map("payroll_services_required")
+  registrationLevel       RegistrationLevel       @map("registration_level")
+  defaultCurrencyId       Int                     @map("default_currency_id")
+  state                   String                  @db.VarChar(200)
+  country                 String                  @default("Nigeria") @db.VarChar(200)
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  deletedAt               DateTime?               @map("deleted_at")
+  isActivate              Boolean                 @default(false)
+  sectorId                Int                     @map("sector_id")
+  sector                  businessSector          @relation(fields: [sectorId], references: [id])
+  subscription            subscription[]
+  userOrganisation        userOrganisation[]
+  subscriptionAddon       subscriptionAddon[]
+
+  @@index([sectorId], map: "organisation_sectorId_fkey")
+}
+
+model credential {
+  id                     BigInt                   @id @default(autoincrement())
+  email                  String                   @unique
+  password               String
+  isVerified             Boolean                  @default(false) @map("is_verified")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  deletedAt              DateTime?                @map("deleted_at")
+  credentialVerification credentialVerification[]
+  user                   user?
+}
+
+model user {
+  id                BigInt             @id @default(autoincrement())
+  firstName         String             @map("first_name")
+  lastName          String             @map("last_name")
+  email             String             @unique
+  phone             String?
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  isActivated       Boolean            @default(false) @map("is_activated")
+  deletedAt         DateTime?          @map("deleted_at")
+  credentialId      BigInt             @unique @map("credential_id")
+  credential        credential         @relation(fields: [credentialId], references: [id])
+  userOrganisations userOrganisation[]
+}
+
+model subscription {
+  id              BigInt              @id @default(autoincrement())
+  pricingPlanId   Int                 @map("pricing_plan_id")
+  startDate       DateTime            @map("start_date")
+  endDate         DateTime            @map("end_date")
+  lastRenewalDate DateTime            @map("last_renewal_date")
+  isAnnual        Boolean             @default(false) @map("is_annual")
+  isActive        Boolean             @default(false) @map("is_active")
+  isTrial         Boolean             @default(false) @map("is_trial")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+  clientId        String              @map("client_id")
+  organisation    organisation        @relation(fields: [clientId], references: [clientId])
+  addOns          subscriptionAddon[]
+}
+
+model businessSector {
+  id            Int                         @id @default(autoincrement())
+  name          String                      @db.VarChar(200)
+  code          String
+  revenueSource BusinessSectorRevenueSource @map("revenue_source")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  updatedAt     DateTime                    @updatedAt @map("updated_at")
+  organisation  organisation[]
+
+  @@map("business_sector")
+}
+
+model credentialVerification {
+  id           BigInt     @id @default(autoincrement())
+  token        String     @unique(map: "credentialVerification_token_key")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  expiresAt    DateTime   @map("expires_at")
+  credentialId BigInt     @map("credential_id")
+  credential   credential @relation(fields: [credentialId], references: [id], onDelete: Cascade, map: "credentialVerification_credentialId_fkey")
+
+  @@index([credentialId], map: "credentialVerification_credentialId_fkey")
+  @@map("credential_verification")
+}
+
+model pricingPlan {
+  id              Int            @id @default(autoincrement())
+  name            String
+  description     String         @db.VarChar(900)
+  features        Json
+  monthlyCost     Float          @map("monthly_cost")
+  annualCost      Float          @map("annual_cost")
+  monthlyDiscount Float          @map("monthly_discount")
+  annualDiscount  Float          @map("annual_discount")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+  productAddons   productAddon[]
+
+  @@map("pricing_plan")
+}
+
+// these are cabsol modules - accounting, inventory, payroll, etc
+model productAddon {
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  description        String              @db.VarChar(900)
+  isDefault          Boolean             @default(false) @map("is_default")
+  features           Json
+  monthlyCost        Float               @map("monthly_cost")
+  annualCost         Float               @map("annual_cost")
+  pricingPlanId      Int                 @map("pricing_plan_id")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @map("updated_at")
+  deletedAt          DateTime?           @map("deleted_at")
+  pricingplan        pricingPlan         @relation(fields: [pricingPlanId], references: [id], map: "productAddon_pricingPlanId_fkey")
+  subscriptionAddons subscriptionAddon[]
+
+  @@index([pricingPlanId], map: "productAddon_pricingPlanId_fkey")
+  @@map("product_addon")
+}
+
+model subscriptionAddon {
+  id             BigInt       @id @default(autoincrement())
+  subscriptionId BigInt       @map("subscription_id")
+  clientId       String       @map("client_id")
+  addOnId        Int          @map("add_on_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @map("updated_at")
+  deletedAt      DateTime?    @map("deleted_at")
+  productAddon   productAddon @relation(fields: [addOnId], references: [id], map: "subscriptionAddon_addOnId_fkey")
+  subscription   subscription @relation(fields: [subscriptionId], references: [id], map: "subscriptionAddon_subscriptionId_fkey")
+  organisation   organisation @relation(fields: [clientId], references: [clientId], map: "subscriptionAddon_clientId_fkey")
+
+  @@index([addOnId], map: "subscriptionAddon_addOnId_fkey")
+  @@index([subscriptionId], map: "subscriptionAddon_subscriptionId_fkey")
+  @@map("subscription_addon")
+}
+
+model userOrganisation {
+  id             BigInt       @id @default(autoincrement())
+  userId         BigInt       @map("user_id")
+  organisationId BigInt       @map("organisation_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  deletedAt      DateTime?    @map("deleted_at")
+  organisation   organisation @relation(fields: [organisationId], references: [id], map: "userOrganisation_organisationId_fkey")
+  user           user         @relation(fields: [userId], references: [id], map: "userOrganisation_userId_fkey")
+
+  @@index([organisationId], map: "userOrganisation_organisationId_fkey")
+  @@index([userId], map: "userOrganisation_userId_fkey")
+  @@map("user_organisation")
+}
+
+model permissionsList {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  slug      String
+  module    Modules
+
+  @@map("permissions_list")
+}
+
+model groups {
+  id          Int    @id @default(autoincrement())
+  name        String
+  description String @db.Text
+}
+
+enum Modules {
+  ACCOUNTING
+  PAYROLL
+  INVENTORY
+  FIXED_ASSETS
+}
+
+enum OrganisationAccountType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum CompanySize {
+  SMALL
+  MEDIUM
+  LARGE
+  ENTERPRISE
+}
+
+enum BusinessSectorRevenueSource {
+  CUSTOMER
+  CLIENT
+  STUDENT
+  PATIENT
+  CITIZEN
+  DONORS
+
+  @@map("businesssector_revenueSource")
+}
+
+enum RegistrationLevel {
+  DATA_ENTRY
+  MODULE_SELECTION
+  PLAN_SELECTION
+  PAYMENT
+}
